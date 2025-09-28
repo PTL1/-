@@ -1,156 +1,215 @@
 <!doctype html>
-<html>
+<html lang="th">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Library</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Library • ห้องสมุดออนไลน์</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    body{background:#f7f8fb}
-    .card{border:0; border-radius:14px; box-shadow:0 6px 20px rgba(0,0,0,.06)}
+    body{background:#f6f8fb}
+    .card{border:0;border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.06)}
     .badge-status{font-size:.8rem}
+    .pointer{cursor:pointer}
   </style>
 </head>
 <body>
 <div class="container py-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="h4 mb-0">📚 Library</h1>
+
+  <!-- Header -->
+  <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-3">
+    <h1 class="h4 m-0">📚 ห้องสมุดออนไลน์</h1>
     <div class="d-flex gap-2">
-      <input id="adminKey" type="password" class="form-control form-control-sm" placeholder="รหัสแอดมิน" style="max-width:160px">
+      <input id="adminKey" type="password" class="form-control form-control-sm" placeholder="รหัสแอดมิน" style="max-width:180px">
+      <button class="btn btn-sm btn-primary" onclick="toggleAdmin()">โหมดแอดมิน</button>
     </div>
   </div>
 
-  <div class="card mb-3"><div class="card-body">
-    <div class="row g-2">
-      <div class="col-md-8"><input id="q" class="form-control" placeholder="ค้นหา ชื่อ/ผู้แต่ง/หมวด" oninput="loadBooks()"></div>
-      <div class="col-md-4 text-md-end">
-        <button class="btn btn-outline-secondary" onclick="loadBooks()">รีเฟรช</button>
-        <button class="btn btn-primary" onclick="toggleAdmin()">โหมดแอดมิน</button>
-      </div>
-    </div>
-  </div></div>
-
-  <div id="adminPanel" class="card mb-3 d-none"><div class="card-body">
-    <h5 class="mb-3">เพิ่ม/แก้ไขหนังสือ</h5>
-    <form onsubmit="return saveBook(event)">
-      <input type="hidden" id="bookId">
+  <!-- Search/Filter -->
+  <div class="card mb-3">
+    <div class="card-body">
       <div class="row g-2">
-        <div class="col-md-4"><input id="title" class="form-control" placeholder="ชื่อหนังสือ" required></div>
-        <div class="col-md-3"><input id="author" class="form-control" placeholder="ผู้แต่ง"></div>
-        <div class="col-md-3"><input id="category" class="form-control" placeholder="หมวดหมู่"></div>
-        <div class="col-md-12"><textarea id="description" class="form-control" rows="2" placeholder="รายละเอียด"></textarea></div>
+        <div class="col-md-6"><input id="q" class="form-control" placeholder="ค้นหา ชื่อ/ผู้แต่ง/หมวด..." oninput="render()"></div>
+        <div class="col-md-3">
+          <select id="filterCat" class="form-select" onchange="render()">
+            <option value="">— ทุกหมวดหมู่ —</option>
+          </select>
+        </div>
+        <div class="col-md-3 text-md-end">
+          <button class="btn btn-outline-secondary" onclick="refresh()">รีเฟรช</button>
+        </div>
       </div>
-      <div class="mt-2 d-flex gap-2">
-        <button class="btn btn-primary" type="submit">บันทึก</button>
-        <button class="btn btn-secondary" type="button" onclick="resetForm()">ล้างฟอร์ม</button>
-        <button id="btnDelete" class="btn btn-danger d-none" type="button" onclick="deleteBook()">ลบ</button>
-      </div>
-    </form>
-  </div></div>
-
-  <div class="card"><div class="card-body">
-    <div class="table-responsive">
-      <table class="table align-middle">
-        <thead><tr><th>#</th><th>ชื่อหนังสือ</th><th>ผู้แต่ง</th><th>หมวด</th><th>สถานะ</th><th class="text-end">การกระทำ</th></tr></thead>
-        <tbody id="rows"></tbody>
-      </table>
     </div>
-  </div></div>
+  </div>
+
+  <!-- Admin Panel -->
+  <div id="adminPanel" class="card mb-3 d-none">
+    <div class="card-body">
+      <h5 class="mb-3">เพิ่ม/แก้ไขหนังสือ</h5>
+      <form onsubmit="return saveBook(event)">
+        <input type="hidden" id="bookId">
+        <div class="row g-2">
+          <div class="col-md-4"><input id="title" class="form-control" placeholder="ชื่อหนังสือ" required></div>
+          <div class="col-md-3"><input id="author" class="form-control" placeholder="ผู้แต่ง"></div>
+          <div class="col-md-3"><input id="category" class="form-control" placeholder="หมวดหมู่"></div>
+          <div class="col-12"><textarea id="description" class="form-control" rows="2" placeholder="คำอธิบาย/รายละเอียด"></textarea></div>
+        </div>
+        <div class="mt-2 d-flex gap-2">
+          <button class="btn btn-primary" type="submit">บันทึก</button>
+          <button class="btn btn-secondary" type="button" onclick="resetForm()">ล้างฟอร์ม</button>
+          <button id="btnDelete" class="btn btn-danger d-none" type="button" onclick="deleteBook()">ลบ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="card">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <div>ทั้งหมด: <span id="statTotal">0</span> | ถูกยืม: <span id="statBorrowed">0</span></div>
+      </div>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>ชื่อ</th>
+              <th>ผู้แต่ง</th>
+              <th>หมวด</th>
+              <th>สถานะ</th>
+              <th class="text-end">การกระทำ</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
 let adminMode = false;
+let books = [];
+
 function toggleAdmin(){
   adminMode = !adminMode;
   document.getElementById('adminPanel').classList.toggle('d-none', !adminMode);
   document.getElementById('btnDelete').classList.toggle('d-none', !adminMode);
 }
 
-async function loadBooks(){
-  const q = document.getElementById('q').value || '';
-  const res = await fetch('/api/books?q='+encodeURIComponent(q));
-  const list = await res.json();
-  const tb = document.getElementById('rows'); tb.innerHTML = '';
-  list.forEach(b=>{
+async function refresh(){
+  const res = await fetch('/api/books');
+  books = await res.json();
+  fillCategories();
+  render();
+}
+
+function fillCategories(){
+  const sel = document.getElementById('filterCat');
+  const current = sel.value;
+  const cats = Array.from(new Set(books.map(b => (b.category||'').trim()).filter(Boolean))).sort();
+  sel.innerHTML = '<option value="">— ทุกหมวดหมู่ —</option>' + cats.map(c=>`<option ${c===current?'selected':''}>${escapeHtml(c)}</option>`).join('');
+}
+
+function render(){
+  const q = (document.getElementById('q').value||'').toLowerCase();
+  const cat = (document.getElementById('filterCat').value||'').toLowerCase();
+  const filtered = books.filter(b=>{
+    const hitQ = !q || (b.title||'').toLowerCase().includes(q) || (b.author||'').toLowerCase().includes(q) || (b.category||'').toLowerCase().includes(q);
+    const hitC = !cat || (b.category||'').toLowerCase() === cat;
+    return hitQ && hitC;
+  });
+
+  const tb = document.getElementById('rows'); tb.innerHTML='';
+  filtered.forEach(b=>{
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${b.id}</td>
-      <td><a href="#" onclick="edit(${b.id});return false;">${escapeHtml(b.title||'')}</a></td>
+      <td class="pointer" onclick="edit(${b.id})">${escapeHtml(b.title||'')}</td>
       <td>${escapeHtml(b.author||'')}</td>
       <td>${escapeHtml(b.category||'')}</td>
-      <td>${b.isBorrowed?'<span class="badge text-bg-danger badge-status">ถูกยืม</span>':'<span class="badge text-bg-success badge-status">พร้อมยืม</span>'}</td>
+      <td>${b.is_borrowed ? '<span class="badge text-bg-danger badge-status">ถูกยืม</span>' : '<span class="badge text-bg-success badge-status">ว่าง</span>'}</td>
       <td class="text-end">
         <div class="btn-group">
           <button class="btn btn-sm btn-outline-secondary" onclick="edit(${b.id})">รายละเอียด</button>
-          <button class="btn btn-sm btn-outline-success" ${b.isBorrowed?'disabled':''} onclick="borrow(${b.id})">ยืม</button>
-          <button class="btn btn-sm btn-outline-warning" ${b.isBorrowed?'':'disabled'} onclick="ret(${b.id})">คืน</button>
+          <button class="btn btn-sm btn-outline-success" ${b.is_borrowed?'disabled':''} onclick="borrow(${b.id})">ยืม</button>
+          <button class="btn btn-sm btn-outline-warning" ${b.is_borrowed?'':'disabled'} onclick="ret(${b.id})">คืน</button>
         </div>
       </td>`;
     tb.appendChild(tr);
   });
+
+  // สถิติ
+  document.getElementById('statTotal').textContent = books.length;
+  document.getElementById('statBorrowed').textContent = books.filter(b=>b.is_borrowed).length;
 }
 
 function edit(id){
-  fetch('/api/books')
-    .then(r=>r.json())
-    .then(list=>{
-      const b = list.find(x=>x.id===id);
-      if (!b) return;
-      document.getElementById('bookId').value = b.id;
-      document.getElementById('title').value = b.title||'';
-      document.getElementById('author').value = b.author||'';
-      document.getElementById('category').value = b.category||'';
-      document.getElementById('description').value = b.description||'';
-      if (adminMode) document.getElementById('adminPanel').classList.remove('d-none');
-      window.scrollTo({top:0,behavior:'smooth'});
-    });
+  const b = books.find(x=>x.id===id);
+  if(!b) return;
+  document.getElementById('bookId').value = b.id;
+  document.getElementById('title').value = b.title||'';
+  document.getElementById('author').value = b.author||'';
+  document.getElementById('category').value = b.category||'';
+  document.getElementById('description').value = b.description||'';
+  if (adminMode) document.getElementById('adminPanel').classList.remove('d-none');
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 
 async function saveBook(e){
   e.preventDefault();
   const adminKey = document.getElementById('adminKey').value;
+  if(!adminKey) return alert('กรุณาใส่รหัสแอดมิน');
+
   const payload = {
     title: document.getElementById('title').value,
     author: document.getElementById('author').value,
     category: document.getElementById('category').value,
-    description: document.getElementById('description').value,
-    adminKey
+    description: document.getElementById('description').value
   };
+
   const id = Number(document.getElementById('bookId').value||0);
   let res;
-  if (id){
-    res = await fetch('/api/books/'+id, {method:'PUT', headers:{'Content-Type':'application/json','x-admin-key':adminKey}, body: JSON.stringify(payload)});
+  if(id){
+    // ใช้ PUT /api/books/:id
+    res = await fetch('/api/books/'+id, { method:'PUT', headers:{'Content-Type':'application/json','x-admin-key':adminKey}, body:JSON.stringify(payload) });
   }else{
-    res = await fetch('/api/books', {method:'POST', headers:{'Content-Type':'application/json','x-admin-key':adminKey}, body: JSON.stringify(payload)});
+    res = await fetch('/api/books', { method:'POST', headers:{'Content-Type':'application/json','x-admin-key':adminKey}, body:JSON.stringify(payload) });
   }
   const out = await res.json();
-  if (!res.ok) return alert(out.error||'Error');
-  resetForm(); loadBooks();
+  if(!res.ok) return alert(out.error||'เกิดข้อผิดพลาด');
+  resetForm(); await refresh();
 }
 
 async function deleteBook(){
-  const id = Number(document.getElementById('bookId').value);
   const adminKey = document.getElementById('adminKey').value;
-  if (!id) return;
-  if (!confirm('ลบหนังสือเล่มนี้?')) return;
-  const res = await fetch('/api/books/'+id, {method:'DELETE', headers:{'x-admin-key':adminKey}});
-  const out = await res.json(); if (!res.ok) return alert(out.error||'Error');
-  resetForm(); loadBooks();
+  const id = Number(document.getElementById('bookId').value||0);
+  if(!id) return;
+  if(!confirm('ลบหนังสือเล่มนี้?')) return;
+  const res = await fetch('/api/books/'+id, { method:'DELETE', headers:{'x-admin-key':adminKey} });
+  const out = await res.json();
+  if(!res.ok) return alert(out.error||'เกิดข้อผิดพลาด');
+  resetForm(); await refresh();
 }
 
 async function borrow(id){
   const adminKey = document.getElementById('adminKey').value;
+  if(!adminKey) return alert('ใส่รหัสแอดมินก่อน');
   const borrower = prompt('ชื่อผู้ยืม:'); if(!borrower) return;
-  const res = await fetch('/api/borrow/'+id, {method:'POST', headers:{'Content-Type':'application/json','x-admin-key':adminKey}, body: JSON.stringify({ borrower })});
-  const out = await res.json(); if (!res.ok) return alert(out.error||'Error');
-  loadBooks();
+  const res = await fetch('/api/borrow/'+id, { method:'POST', headers:{'Content-Type':'application/json','x-admin-key':adminKey}, body:JSON.stringify({ borrower })});
+  const out = await res.json();
+  if(!res.ok) return alert(out.error||'ยืมไม่สำเร็จ');
+  await refresh();
 }
 async function ret(id){
   const adminKey = document.getElementById('adminKey').value;
-  if (!confirm('ยืนยันการคืน?')) return;
-  const res = await fetch('/api/return/'+id, {method:'POST', headers:{'x-admin-key':adminKey}});
-  const out = await res.json(); if (!res.ok) return alert(out.error||'Error');
-  loadBooks();
+  if(!adminKey) return alert('ใส่รหัสแอดมินก่อน');
+  if(!confirm('ยืนยันการคืน?')) return;
+  const res = await fetch('/api/return/'+id, { method:'POST', headers:{'x-admin-key':adminKey} });
+  const out = await res.json();
+  if(!res.ok) return alert(out.error||'คืนไม่สำเร็จ');
+  await refresh();
 }
 
 function resetForm(){
@@ -160,9 +219,10 @@ function resetForm(){
   document.getElementById('category').value='';
   document.getElementById('description').value='';
 }
+
 function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
 
-document.addEventListener('DOMContentLoaded', loadBooks);
+document.addEventListener('DOMContentLoaded', refresh);
 </script>
 </body>
 </html>

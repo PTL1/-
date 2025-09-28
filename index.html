@@ -1,15 +1,14 @@
 <!doctype html>
 <html lang="th">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Library • ห้องสมุดออนไลน์</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>ห้องสมุดออนไลน์</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     body{background:#f6f8fb}
     .card{border:0;border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.06)}
     .badge-status{font-size:.8rem}
-    .pointer{cursor:pointer}
   </style>
 </head>
 <body>
@@ -18,9 +17,13 @@
   <!-- Header -->
   <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-3">
     <h1 class="h4 m-0">📚 ห้องสมุดออนไลน์</h1>
-    <div class="d-flex gap-2">
-      <input id="adminKey" type="password" class="form-control form-control-sm" placeholder="รหัสแอดมิน" style="max-width:180px">
-      <button class="btn btn-sm btn-primary" onclick="toggleAdmin()">โหมดแอดมิน</button>
+
+    <!-- Login Area -->
+    <div class="d-flex align-items-center gap-2">
+      <input id="loginKey" type="password" class="form-control form-control-sm" placeholder="รหัสแอดมิน" style="max-width:180px">
+      <button id="btnLogin" class="btn btn-sm btn-primary" onclick="login()">เข้าสู่ระบบ</button>
+      <button id="btnLogout" class="btn btn-sm btn-outline-secondary d-none" onclick="logout()">ออกจากระบบ</button>
+      <span id="loginStatus" class="text-success small d-none">เข้าสู่ระบบแล้ว</span>
     </div>
   </div>
 
@@ -41,7 +44,7 @@
     </div>
   </div>
 
-  <!-- Admin Panel -->
+  <!-- Admin Panel (เห็นก็ต่อเมื่อ login แล้ว) -->
   <div id="adminPanel" class="card mb-3 d-none">
     <div class="card-body">
       <h5 class="mb-3">เพิ่ม/แก้ไขหนังสือ</h5>
@@ -72,12 +75,7 @@
         <table class="table align-middle">
           <thead>
             <tr>
-              <th>#</th>
-              <th>ชื่อ</th>
-              <th>ผู้แต่ง</th>
-              <th>หมวด</th>
-              <th>สถานะ</th>
-              <th class="text-end">การกระทำ</th>
+              <th>#</th><th>ชื่อ</th><th>ผู้แต่ง</th><th>หมวด</th><th>สถานะ</th><th class="text-end">การกระทำ</th>
             </tr>
           </thead>
           <tbody id="rows"></tbody>
@@ -89,29 +87,58 @@
 </div>
 
 <script>
-let adminMode = false;
 let books = [];
+let loggedIn = false;
 
-function toggleAdmin(){
-  adminMode = !adminMode;
-  document.getElementById('adminPanel').classList.toggle('d-none', !adminMode);
-  document.getElementById('btnDelete').classList.toggle('d-none', !adminMode);
+// ====== Login Flow ======
+function getAdminKey(){ return (localStorage.getItem('adminKey') || '').trim(); }
+function setAdminKey(k){ localStorage.setItem('adminKey', (k||'').trim()); }
+function clearAdminKey(){ localStorage.removeItem('adminKey'); }
+
+async function login(){
+  const key = (document.getElementById('loginKey').value || '').trim();
+  if(!key) return alert('กรอกรหัสแอดมิน');
+  const r = await fetch('/api/login', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ adminKey: key })
+  });
+  if(r.ok){
+    setAdminKey(key);
+    loggedIn = true;
+    updateLoginUI();
+    document.getElementById('adminPanel').classList.remove('d-none');
+    alert('เข้าสู่ระบบสำเร็จ');
+  }else{
+    const t = await r.json().catch(()=>({}));
+    alert(t.error || 'เข้าสู่ระบบไม่สำเร็จ');
+  }
+}
+function logout(){
+  clearAdminKey();
+  loggedIn = false;
+  updateLoginUI();
+  document.getElementById('adminPanel').classList.add('d-none');
 }
 
+function updateLoginUI(){
+  document.getElementById('btnLogin').classList.toggle('d-none', loggedIn);
+  document.getElementById('btnLogout').classList.toggle('d-none', !loggedIn);
+  document.getElementById('loginStatus').classList.toggle('d-none', !loggedIn);
+}
+
+// ====== Data ======
 async function refresh(){
   const res = await fetch('/api/books');
   books = await res.json();
   fillCategories();
   render();
 }
-
 function fillCategories(){
   const sel = document.getElementById('filterCat');
   const current = sel.value;
   const cats = Array.from(new Set(books.map(b => (b.category||'').trim()).filter(Boolean))).sort();
   sel.innerHTML = '<option value="">— ทุกหมวดหมู่ —</option>' + cats.map(c=>`<option ${c===current?'selected':''}>${escapeHtml(c)}</option>`).join('');
 }
-
 function render(){
   const q = (document.getElementById('q').value||'').toLowerCase();
   const cat = (document.getElementById('filterCat').value||'').toLowerCase();
@@ -126,23 +153,22 @@ function render(){
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${b.id}</td>
-      <td class="pointer" onclick="edit(${b.id})">${escapeHtml(b.title||'')}</td>
+      <td class="text-primary" style="cursor:pointer" onclick="edit(${b.id})">${escapeHtml(b.title||'')}</td>
       <td>${escapeHtml(b.author||'')}</td>
       <td>${escapeHtml(b.category||'')}</td>
-      <td>${b.is_borrowed ? '<span class="badge text-bg-danger badge-status">ถูกยืม</span>' : '<span class="badge text-bg-success badge-status">ว่าง</span>'}</td>
+      <td>${b.isBorrowed ? '<span class="badge text-bg-danger badge-status">ถูกยืม</span>' : '<span class="badge text-bg-success badge-status">ว่าง</span>'}</td>
       <td class="text-end">
         <div class="btn-group">
           <button class="btn btn-sm btn-outline-secondary" onclick="edit(${b.id})">รายละเอียด</button>
-          <button class="btn btn-sm btn-outline-success" ${b.is_borrowed?'disabled':''} onclick="borrow(${b.id})">ยืม</button>
-          <button class="btn btn-sm btn-outline-warning" ${b.is_borrowed?'':'disabled'} onclick="ret(${b.id})">คืน</button>
+          <button class="btn btn-sm btn-outline-success" ${b.isBorrowed?'disabled':''} onclick="borrow(${b.id})">ยืม</button>
+          <button class="btn btn-sm btn-outline-warning" ${b.isBorrowed?'':'disabled'} onclick="ret(${b.id})">คืน</button>
         </div>
       </td>`;
     tb.appendChild(tr);
   });
 
-  // สถิติ
   document.getElementById('statTotal').textContent = books.length;
-  document.getElementById('statBorrowed').textContent = books.filter(b=>b.is_borrowed).length;
+  document.getElementById('statBorrowed').textContent = books.filter(b=>b.isBorrowed).length;
 }
 
 function edit(id){
@@ -153,76 +179,8 @@ function edit(id){
   document.getElementById('author').value = b.author||'';
   document.getElementById('category').value = b.category||'';
   document.getElementById('description').value = b.description||'';
-  if (adminMode) document.getElementById('adminPanel').classList.remove('d-none');
+  if (loggedIn) document.getElementById('adminPanel').classList.remove('d-none');
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
-async function saveBook(e){
-  e.preventDefault();
-  const adminKey = document.getElementById('adminKey').value;
-  if(!adminKey) return alert('กรุณาใส่รหัสแอดมิน');
-
-  const payload = {
-    title: document.getElementById('title').value,
-    author: document.getElementById('author').value,
-    category: document.getElementById('category').value,
-    description: document.getElementById('description').value
-  };
-
-  const id = Number(document.getElementById('bookId').value||0);
-  let res;
-  if(id){
-    // ใช้ PUT /api/books/:id
-    res = await fetch('/api/books/'+id, { method:'PUT', headers:{'Content-Type':'application/json','x-admin-key':adminKey}, body:JSON.stringify(payload) });
-  }else{
-    res = await fetch('/api/books', { method:'POST', headers:{'Content-Type':'application/json','x-admin-key':adminKey}, body:JSON.stringify(payload) });
-  }
-  const out = await res.json();
-  if(!res.ok) return alert(out.error||'เกิดข้อผิดพลาด');
-  resetForm(); await refresh();
-}
-
-async function deleteBook(){
-  const adminKey = document.getElementById('adminKey').value;
-  const id = Number(document.getElementById('bookId').value||0);
-  if(!id) return;
-  if(!confirm('ลบหนังสือเล่มนี้?')) return;
-  const res = await fetch('/api/books/'+id, { method:'DELETE', headers:{'x-admin-key':adminKey} });
-  const out = await res.json();
-  if(!res.ok) return alert(out.error||'เกิดข้อผิดพลาด');
-  resetForm(); await refresh();
-}
-
-async function borrow(id){
-  const adminKey = document.getElementById('adminKey').value;
-  if(!adminKey) return alert('ใส่รหัสแอดมินก่อน');
-  const borrower = prompt('ชื่อผู้ยืม:'); if(!borrower) return;
-  const res = await fetch('/api/borrow/'+id, { method:'POST', headers:{'Content-Type':'application/json','x-admin-key':adminKey}, body:JSON.stringify({ borrower })});
-  const out = await res.json();
-  if(!res.ok) return alert(out.error||'ยืมไม่สำเร็จ');
-  await refresh();
-}
-async function ret(id){
-  const adminKey = document.getElementById('adminKey').value;
-  if(!adminKey) return alert('ใส่รหัสแอดมินก่อน');
-  if(!confirm('ยืนยันการคืน?')) return;
-  const res = await fetch('/api/return/'+id, { method:'POST', headers:{'x-admin-key':adminKey} });
-  const out = await res.json();
-  if(!res.ok) return alert(out.error||'คืนไม่สำเร็จ');
-  await refresh();
-}
-
-function resetForm(){
-  document.getElementById('bookId').value='';
-  document.getElementById('title').value='';
-  document.getElementById('author').value='';
-  document.getElementById('category').value='';
-  document.getElementById('description').value='';
-}
-
-function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
-
-document.addEventListener('DOMContentLoaded', refresh);
-</script>
-</body>
-</html>
+// ====== Admin Actions (ส่ง header อัตโนมัติหลัง login) ==

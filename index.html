@@ -1,0 +1,168 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Library</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <style>
+    body{background:#f7f8fb}
+    .card{border:0; border-radius:14px; box-shadow:0 6px 20px rgba(0,0,0,.06)}
+    .badge-status{font-size:.8rem}
+  </style>
+</head>
+<body>
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4 mb-0">📚 Library</h1>
+    <div class="d-flex gap-2">
+      <input id="adminKey" type="password" class="form-control form-control-sm" placeholder="รหัสแอดมิน" style="max-width:160px">
+    </div>
+  </div>
+
+  <div class="card mb-3"><div class="card-body">
+    <div class="row g-2">
+      <div class="col-md-8"><input id="q" class="form-control" placeholder="ค้นหา ชื่อ/ผู้แต่ง/หมวด" oninput="loadBooks()"></div>
+      <div class="col-md-4 text-md-end">
+        <button class="btn btn-outline-secondary" onclick="loadBooks()">รีเฟรช</button>
+        <button class="btn btn-primary" onclick="toggleAdmin()">โหมดแอดมิน</button>
+      </div>
+    </div>
+  </div></div>
+
+  <div id="adminPanel" class="card mb-3 d-none"><div class="card-body">
+    <h5 class="mb-3">เพิ่ม/แก้ไขหนังสือ</h5>
+    <form onsubmit="return saveBook(event)">
+      <input type="hidden" id="bookId">
+      <div class="row g-2">
+        <div class="col-md-4"><input id="title" class="form-control" placeholder="ชื่อหนังสือ" required></div>
+        <div class="col-md-3"><input id="author" class="form-control" placeholder="ผู้แต่ง"></div>
+        <div class="col-md-3"><input id="category" class="form-control" placeholder="หมวดหมู่"></div>
+        <div class="col-md-12"><textarea id="description" class="form-control" rows="2" placeholder="รายละเอียด"></textarea></div>
+      </div>
+      <div class="mt-2 d-flex gap-2">
+        <button class="btn btn-primary" type="submit">บันทึก</button>
+        <button class="btn btn-secondary" type="button" onclick="resetForm()">ล้างฟอร์ม</button>
+        <button id="btnDelete" class="btn btn-danger d-none" type="button" onclick="deleteBook()">ลบ</button>
+      </div>
+    </form>
+  </div></div>
+
+  <div class="card"><div class="card-body">
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead><tr><th>#</th><th>ชื่อหนังสือ</th><th>ผู้แต่ง</th><th>หมวด</th><th>สถานะ</th><th class="text-end">การกระทำ</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div></div>
+</div>
+
+<script>
+let adminMode = false;
+function toggleAdmin(){
+  adminMode = !adminMode;
+  document.getElementById('adminPanel').classList.toggle('d-none', !adminMode);
+  document.getElementById('btnDelete').classList.toggle('d-none', !adminMode);
+}
+
+async function loadBooks(){
+  const q = document.getElementById('q').value || '';
+  const res = await fetch('/api/books?q='+encodeURIComponent(q));
+  const list = await res.json();
+  const tb = document.getElementById('rows'); tb.innerHTML = '';
+  list.forEach(b=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${b.id}</td>
+      <td><a href="#" onclick="edit(${b.id});return false;">${escapeHtml(b.title||'')}</a></td>
+      <td>${escapeHtml(b.author||'')}</td>
+      <td>${escapeHtml(b.category||'')}</td>
+      <td>${b.isBorrowed?'<span class="badge text-bg-danger badge-status">ถูกยืม</span>':'<span class="badge text-bg-success badge-status">พร้อมยืม</span>'}</td>
+      <td class="text-end">
+        <div class="btn-group">
+          <button class="btn btn-sm btn-outline-secondary" onclick="edit(${b.id})">รายละเอียด</button>
+          <button class="btn btn-sm btn-outline-success" ${b.isBorrowed?'disabled':''} onclick="borrow(${b.id})">ยืม</button>
+          <button class="btn btn-sm btn-outline-warning" ${b.isBorrowed?'':'disabled'} onclick="ret(${b.id})">คืน</button>
+        </div>
+      </td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function edit(id){
+  fetch('/api/books')
+    .then(r=>r.json())
+    .then(list=>{
+      const b = list.find(x=>x.id===id);
+      if (!b) return;
+      document.getElementById('bookId').value = b.id;
+      document.getElementById('title').value = b.title||'';
+      document.getElementById('author').value = b.author||'';
+      document.getElementById('category').value = b.category||'';
+      document.getElementById('description').value = b.description||'';
+      if (adminMode) document.getElementById('adminPanel').classList.remove('d-none');
+      window.scrollTo({top:0,behavior:'smooth'});
+    });
+}
+
+async function saveBook(e){
+  e.preventDefault();
+  const adminKey = document.getElementById('adminKey').value;
+  const payload = {
+    title: document.getElementById('title').value,
+    author: document.getElementById('author').value,
+    category: document.getElementById('category').value,
+    description: document.getElementById('description').value,
+    adminKey
+  };
+  const id = Number(document.getElementById('bookId').value||0);
+  let res;
+  if (id){
+    res = await fetch('/api/books/'+id, {method:'PUT', headers:{'Content-Type':'application/json','x-admin-key':adminKey}, body: JSON.stringify(payload)});
+  }else{
+    res = await fetch('/api/books', {method:'POST', headers:{'Content-Type':'application/json','x-admin-key':adminKey}, body: JSON.stringify(payload)});
+  }
+  const out = await res.json();
+  if (!res.ok) return alert(out.error||'Error');
+  resetForm(); loadBooks();
+}
+
+async function deleteBook(){
+  const id = Number(document.getElementById('bookId').value);
+  const adminKey = document.getElementById('adminKey').value;
+  if (!id) return;
+  if (!confirm('ลบหนังสือเล่มนี้?')) return;
+  const res = await fetch('/api/books/'+id, {method:'DELETE', headers:{'x-admin-key':adminKey}});
+  const out = await res.json(); if (!res.ok) return alert(out.error||'Error');
+  resetForm(); loadBooks();
+}
+
+async function borrow(id){
+  const adminKey = document.getElementById('adminKey').value;
+  const borrower = prompt('ชื่อผู้ยืม:'); if(!borrower) return;
+  const res = await fetch('/api/borrow/'+id, {method:'POST', headers:{'Content-Type':'application/json','x-admin-key':adminKey}, body: JSON.stringify({ borrower })});
+  const out = await res.json(); if (!res.ok) return alert(out.error||'Error');
+  loadBooks();
+}
+async function ret(id){
+  const adminKey = document.getElementById('adminKey').value;
+  if (!confirm('ยืนยันการคืน?')) return;
+  const res = await fetch('/api/return/'+id, {method:'POST', headers:{'x-admin-key':adminKey}});
+  const out = await res.json(); if (!res.ok) return alert(out.error||'Error');
+  loadBooks();
+}
+
+function resetForm(){
+  document.getElementById('bookId').value='';
+  document.getElementById('title').value='';
+  document.getElementById('author').value='';
+  document.getElementById('category').value='';
+  document.getElementById('description').value='';
+}
+function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+
+document.addEventListener('DOMContentLoaded', loadBooks);
+</script>
+</body>
+</html>
